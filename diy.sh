@@ -39,7 +39,6 @@ sed -i 's/..\/..\/luci.mk/$(TOPDIR)\/feeds\/luci\/luci.mk/g' feeds/*/*/*/Makefil
 ./scripts/feeds update -a && ./scripts/feeds install -a
 
 rm -Rf package/*/*/qBittorrent/patches
-sed -i 's/liuzhuoling2011/garypang13/g' package/*/*/baidupcs-web/Makefile
 rm -Rf feeds/packages/lang/php7 && svn co https://github.com/openwrt/packages/branches/openwrt-19.07/lang/php7 feeds/packages/lang/php7
 rm -Rf files/usr/share/amule/webserver/AmuleWebUI-Reloaded && git clone https://github.com/MatteoRagni/AmuleWebUI-Reloaded files/usr/share/amule/webserver/AmuleWebUI-Reloaded
 rm -Rf files/usr/share/aria2 && git clone https://github.com/P3TERX/aria2.conf files/usr/share/aria2
@@ -55,16 +54,11 @@ sed -i '/resolvfile=/d' package/*/*/luci-app-adguardhome/root/etc/init.d/AdGuard
 sed -i 's/LUCI_DEPENDS:=/LUCI_DEPENDS:=+transmission-daemon-openssl /g' package/*/*/luci-app-transmission/Makefile
 sed -i '/_redirect2ssl/d' package/*/*/nginx/Makefile
 sed -i '/init_lan/d' package/*/*/nginx/files/nginx.init
-sed -i '$a /etc/sysupgrade.conf' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/shadow' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/rc.local' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/smartdns' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /www/kod/config' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/qBittorrent' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /root/amule' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/amule' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/aria2' package/base-files/files/etc/sysupgrade.conf
-sed -i '$a /etc/rclone' package/base-files/files/etc/sysupgrade.conf
+sed -i '$a /etc/sysupgrade.conf' package/base-files/files/lib/upgrade/keep.d/base-files-essential
+sed -i '$a /etc/smartdns' package/base-files/files/lib/upgrade/keep.d/base-files-essential
+sed -i '$a /www/kod/config/setting_user.php' package/base-files/files/lib/upgrade/keep.d/base-files-essential
+sed -i '$a /www/kod/config/config.php' package/base-files/files/lib/upgrade/keep.d/base-files-essential
+sed -i '$a /etc/amule' package/base-files/files/lib/upgrade/keep.d/base-files-essential
 find target/linux/x86 -name "config*" | xargs -i sed -i '$a CONFIG_64BIT=y\n# CONFIG_WLAN is not set\n# CONFIG_WIRELESS is not set\
 \nCONFIG_NETFILTER=y\nCONFIG_NETFILTER_XTABLES=y\nCONFIG_NETFILTER_XT_MATCH_STRING=y\nCONFIG_HWMON=y\nCONFIG_SENSORS_CORETEMP=y\nCONFIG_X86_ACPI_CPUFREQ_CPB=y' {}
 sed -i '/continue$/d' package/*/*/luci-app-ssr-plus/root/usr/bin/ssr-switch
@@ -77,21 +71,12 @@ rm -Rf package/network/config/firewall/patches/fullconenat.patch
 wget -P package/network/config/firewall/patches/ https://github.com/coolsnowwolf/lede/raw/master/package/network/config/firewall/patches/fullconenat.patch
 sed -i 's/getElementById("cbid.amule.main/getElementById("widget.cbid.amule.main/g' package/*/*/luci-app-amule/luasrc/view/amule/overview_status.htm
 getversion(){
-ver=$(basename $(curl -Ls -o /dev/null -w %{url_effective} https://github.com/$1/releases/latest) | grep -o -E "[0-9.]+")
-[ $ver ] && echo $ver || git ls-remote --tags git://github.com/$1 | cut -d/ -f3- | sort -t. -nk1,2 -k3 | awk '/^[^{]*$/{version=$1}END{print version}' | grep -o -E "[0-9.]+"
+ver=$(basename $(curl -Ls -o /dev/null -w %{url_effective} https://github.com/$1/releases/latest) | grep -o -E "[0-9].+")
+[ $ver ] && echo $ver || git ls-remote --tags git://github.com/$1 | cut -d/ -f3- | sort -t. -nk1,2 -k3 | awk '/^[^{]*$/{version=$1}END{print version}' | grep -o -E "[0-9].+"
 }
 sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion v2ray/v2ray-core)/g" package/*/*/v2ray/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion aria2/aria2)/g" package/*/*/aria2/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion Neilpang/acme.sh)/g" package/*/*/acme/Makefile
-# sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion netdata/netdata)/g" package/*/*/netdata/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion tsl0922/ttyd)/g" package/*/*/ttyd/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion docker/docker-ce)/g" package/*/*/docker-ce/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion cifsd-team/cifsd)/g" package/*/*/ksmbd/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion cifsd-team/cifsd-tools)/g" package/*/*/ksmbd-tools/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=v$(getversion AdguardTeam/AdGuardHome)/g" package/*/*/openwrt-adguardhome/Makefile
-sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion garypang13/baidupcs-web)/g" package/*/*/baidupcs-web/Makefile
-find package/*/*/aria2/ package/*/*/acme/ package/*/*/netdata/ package/*/*/ttyd/ package/*/*/docker-ce/ package/*/*/v2ray/ \
-package/*/*/ksmbd/ package/*/*/ksmbd-tools/ -maxdepth 1 -name "Makefile" | xargs -i sed -i "s/PKG_HASH:=.*/PKG_HASH:=skip/g" {}
+sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$(getversion AdguardTeam/AdGuardHome)/g" package/*/*/openwrt-adguardhome/Makefile
+sed -i "s/PKG_HASH:=.*/PKG_HASH:=skip/g" package/feeds/custom/*/Makefile
 find package/*/custom/*/ -maxdepth 2 ! -path "*shadowsocksr-libev*" -name "Makefile" ! -path "*rclone*" -name "Makefile" \
 | xargs -i sed -i "s/PKG_SOURCE_VERSION:=[0-9a-z]\{15,\}/PKG_SOURCE_VERSION:=latest/g" {}
 find package/*/custom/*/ -maxdepth 2 -name "Makefile" | xargs -i sed -i "s/SUBDIRS=/M=/g" {}

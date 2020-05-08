@@ -128,11 +128,9 @@ jobs:
 
     - name: Organize files
       id: organize
-      continue-on-error: true
       run: |
         mkdir firmware && find openwrt/bin/*/*/*/ -maxdepth 1 \
         -name "*combined*" \
-        -or -name "*vmdk*" \
         -or -name "sha256sums" \
         -or -name "*adbyby*" \
         -or -name "*passwall*" \
@@ -150,8 +148,9 @@ jobs:
         | xargs -i mv -f {} ./firmware/
         cp openwrt/.config  ./firmware/config.txt
         cd firmware
-        rename -v "s/^openwrt/${{ env.date3 }}-openwrt/" *img.gz
+        rename -v "s/^openwrt/${{ env.date3 }}-openwrt/" *combined*
         zip -r luci-app-adbyby-plus.zip *adbyby* || true
+        zip -r luci-app-passwall.zip *passwall* *chinadns* *haproxy* || true
         zip -r luci-app-baidupcs-web.zip *baidupcs* || true
         zip -r luci-app-cifs-mount.zip *cifs-mount* || true
         zip -r luci-app-music-remote-center.zip *music-remote-center* *forked-daapd* || true
@@ -170,7 +169,17 @@ jobs:
         RANDOM=$$$(date +%s)
         rand=$[$RANDOM % ${#Emoji[@]}]
         echo "::set-env name=EMOJI::${Emoji[$rand]}"
-      
+ 
+    - name: Upload firmware to cowtransfer
+      if: env.UPLOAD_FIRMWARE_TO_COWTRANSFER == 'true'
+      continue-on-error: true
+      run: |
+        curl -fsSL git.io/file-transfer | sh
+        cowurl=$(./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE})
+        cowurl=$(echo $cowurl | grep -o -E "https[^ ]*")
+        echo "::set-env name=COWURL::$cowurl"
+        echo "Download Link: ${{ env.EMOJI }} ${{ env.COWURL }} ${{ env.EMOJI }}"
+ 
     - name: Create release
       id: create_release
       uses: actions/create-release@master
@@ -180,6 +189,9 @@ jobs:
       with:
         tag_name: ${{ env.date }}_${{ env.DEVICE_NAME }}
         release_name: ${{ env.date2 }} ${{ env.DEVICE_NAME }} ${{ env.EMOJI }}
+        body: |
+            国内加速下载:
+            ${{ env.COWURL }} ${{ env.EMOJI }}
         draft: false
         prerelease: false     
 
@@ -198,13 +210,6 @@ jobs:
       with:
         name: ${{ env.date3 }} ${{ env.DEVICE_NAME }} ${{ env.EMOJI }}
         path: ${{ env.FIRMWARE }}
-
-    - name: Upload firmware to cowtransfer
-      if: env.UPLOAD_FIRMWARE_TO_COWTRANSFER == 'true'
-      run: |
-        curl -fsSL git.io/file-transfer | sh
-        ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
-        echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
         
     - name: WeChat notification
       if: env.SCKEY && !cancelled()
