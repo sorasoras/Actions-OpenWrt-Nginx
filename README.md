@@ -7,7 +7,7 @@
 + 性能,友好度,易用性,插件,以及针对国内特殊环境等的自定义优化
 
 + uhttpd替换为nginx,大大增加可玩性:
-     + nginx搭配PHP与可道云,建站,NAS两不误,基本可替换群晖等专业NAS系统
+     + Nginx+PHP+MariaDB, 用于搭建FileRun,可道云等云盘,建站等.
      + 通过nginx实现Webdav 自建共享同步网盘神器
      + nginx反向代理 实现后台每个页面与服务都可通过自定义域名访问
 
@@ -37,7 +37,9 @@ X86_64固件在此 [Releases](https://github.com/garypang13/Actions-OpenWrt-Ngin
 
 在仓库Settings->Secrets中分别添加 PPPOE_USERNAME, PPPOE_PASSWD 可设置默认拨号账号密码.
 
-在仓库Settings->Secrets中添加 SCKEY 可通过[Server酱](http://sc.ftqq.com)推送编译结果到微信
+Secrets中添加 SCKEY 可通过[Server酱](http://sc.ftqq.com)推送编译结果到微信
+
+Secrets中添加 TELEGRAM_TO (chat_id), TELEGRAM_TOKEN (token) 可推送编译结果到Telegram Bot. [教程](https://longnight.github.io/2018/12/12/Telegram-Bot-notifications)
 
 点击右上角的Star按钮开始编译
 
@@ -47,6 +49,7 @@ diy云编译教程: [Read the details in my blog (in Chinese) | 中文教程](ht
 
 + SSR Plus
 + AdguardHome DNS+恶意网址过滤
++ FileRun  google drive风格多功能网盘
 + 上网时间控制
 + 微信推送
 + ACME自动SSL证书生成
@@ -59,7 +62,7 @@ diy云编译教程: [Read the details in my blog (in Chinese) | 中文教程](ht
 + ttyd 网页版终端
 + UPNP 自动端口转发
 + Aria2 全能下载工具
-+ BaiduPCS-Web 百度网盘web客户端(修复登录)
++ BaiduPCS-Web 百度网盘web客户端(Aria2+修复登录)
 + cifsd + NFS 网络共享
 + Netdata 全能性能监控
 + diskman 磁盘管理
@@ -67,16 +70,19 @@ diy云编译教程: [Read the details in my blog (in Chinese) | 中文教程](ht
 + Rclone 网盘挂载,同步工具
 + qBittorrent BT下载工具
 + Transmission BT/PT下載工具
-+ 可道云 做NAS必备
-+ PHP 建站与可道云必备
 + aMule 电骡下载 ed2k必备
 + Turbo ACC 网络加速
 + SQM QOS 智能网络优化
 + eqos IP限速
++ Mwan3 负载均衡
 + AppFilter App过滤
 + nlbwmon 宽带监控
 
 其他插件请在[Releases](https://github.com/garypang13/Actions-OpenWrt-Nginx/releases/latest)中下载对应的ipk文件,自行安装.
+
+#### 默认后台地址 10.0.0.1, 密码 root
+
+#### 请分配不低于1G 的内存和磁盘空间.
 
 ### 如何在本地使用此项目编译自己需要的 OpenWrt 固件
 
@@ -84,7 +90,6 @@ diy云编译教程: [Read the details in my blog (in Chinese) | 中文教程](ht
 
 1. **不**要用 **root** 用户 git 和编译！！！
 2. 国内用户编译前请准备好梯子,使用大陆白名单或全局模式
-3. 默认登陆10.0.0.1, 密码 root
 
 #### 编译命令如下:
 
@@ -102,7 +107,7 @@ git clone https://github.com/garypang13/Actions-OpenWrt-Nginx
 cp -Rf Actions-OpenWrt-Nginx/* openwrt/
 cd openwrt
 ./scripts/feeds update -a
-./diy.sh
+sh ./diy.sh
 mv X86_64.config .config
 make defconfig
    ```
@@ -111,10 +116,13 @@ make defconfig
 rm -Rf Actions-OpenWrt-Nginx && git clone https://github.com/garypang13/Actions-OpenWrt-Nginx
 cp -Rf Actions-OpenWrt-Nginx/* openwrt/
 cd openwrt
-git pull 
-rm -Rf feeds
-./scripts/feeds update -a
-./diy.sh
+rm -Rf feeds package tmp
+svn co https://github.com/openwrt/openwrt/trunk/package
+git pull
+[ -f ".config" ] && mv .config .config.bak
+./scripts/feeds update custom -a
+sh ./diy.sh
+[ -f ".config.bak" ] && mv .config.bak .config || mv X86_64.config .config
 make defconfig
    ```
 5. 如需修改默认配置比如定制插件等,请执行 `make menuconfig`

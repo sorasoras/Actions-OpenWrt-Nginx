@@ -19,6 +19,8 @@ env:
   PPPOE_USERNAME: ${{ secrets.PPPOE_USERNAME }}
   PPPOE_PASSWD: ${{ secrets.PPPOE_PASSWD }}
   SCKEY: ${{ secrets.SCKEY }}
+  TELEGRAM_TOKEN : ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_TO : ${{ secrets.TELEGRAM_TO }}
   TZ: Asia/Shanghai
 
 jobs:
@@ -30,7 +32,7 @@ jobs:
       uses: actions/checkout@master
   
     - name: Load Settings.ini
-      run: |    
+      run: |
         source "${GITHUB_WORKSPACE}/settings.ini"
         echo "::set-env name=REPO_URL::${REPO_URL}"
         echo "::set-env name=REPO_BRANCH::${REPO_BRANCH}"
@@ -80,15 +82,18 @@ jobs:
         ln -s /mnt/openwrt/staging_dir openwrt/staging_dir
 
     - name: Update feeds
-      run: cd openwrt && ./scripts/feeds update -a
+      run: cd openwrt && ./scripts/feeds update custom -a
 
     - name: Load custom configuration
       run: |
         cp -Rf * openwrt/ || true
         cd openwrt
         chmod +x $DIY_SH
-        ./$DIY_SH
+        ./$DIY_SH >/dev/null
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE .config
+        [ ${{ github.event.repository.owner.id }} != '48883331' ] && {
+        sed -i "s/=m/=n/g" .config
+        }
         make defconfig
         [ $(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/') == generic ] && DEVICE_NAME=$(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/CONFIG_TARGET_(.*)_DEVICE_.*=y/\1/') || DEVICE_NAME=$(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/')
         echo "::set-env name=DEVICE_NAME::$DEVICE_NAME"
@@ -101,7 +106,7 @@ jobs:
         sed -i '$i uci commit network' openwrt/package/*/*/default-settings/files/zzz-default-settings
               
     - name: SSH connection to Actions
-      uses: P3TERX/debugger-action@master
+      uses: garypang13/debugger-action@master
       if: env.SSH_ACTIONS == 'true'
 
     - name: Download package
@@ -134,6 +139,7 @@ jobs:
         -or -name "sha256sums" \
         -or -name "*adbyby*" \
         -or -name "*passwall*" \
+        -or -name "*kodexplorer*" \
         -or -name "*chinadns*" \
         -or -name "*cifs-mount*" \
         -or -name "*music-remote-center*" -or -name "*forked-daapd*" \
@@ -151,6 +157,7 @@ jobs:
         cd firmware
         rename -v "s/^openwrt/${{ env.date3 }}-openwrt/" *combined*
         zip -r luci-app-adbyby-plus.zip *adbyby* || true
+        zip -r luci-app-php-kodexplorer *kodexplorer* || true
         zip -r luci-app-passwall.zip *passwall* *chinadns* *haproxy* || true
         zip -r luci-app-baidupcs-web.zip *baidupcs* || true
         zip -r luci-app-cifs-mount.zip *cifs-mount* || true
@@ -179,25 +186,28 @@ jobs:
         cowurl=$(./transfer cow --block 2621440 -s --no-progress ${FIRMWARE})
         cowurl=$(echo $cowurl | grep -o -E "https[^ ]*")
         echo "::set-env name=COWURL::$cowurl"
-        echo "Download Link: ${{ env.EMOJI }} $cowurl ${{ env.EMOJI }}"
+        echo "Download Link: ${{ env.EMOJI }} $cowurl ${{ env.EMOJI }} 🚀"
  
     - name: Create release
       id: create_release
       uses: actions/create-release@master
-      if: env.UPLOAD_FIRMWARE_FOR_RELEASE == 'true'
+      continue-on-error: true
+      if: env.REPO_TOKEN && env.UPLOAD_FIRMWARE_FOR_RELEASE == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
       with:
         tag_name: ${{ env.date }}_${{ env.DEVICE_NAME }}
         release_name: ${{ env.date2 }} ${{ env.DEVICE_NAME }} ${{ env.EMOJI }}
         body: |
-            国内加速下载:
-            ${{ env.COWURL }} ${{ env.EMOJI }}
+            墙内加速下载🔥:
+            ${{ env.COWURL }} 🚀
+            请分配不低于1G 的内存和存储空间💾.
         draft: false
         prerelease: false     
 
     - name: Upload firmware for release
       uses: csexton/release-asset-action@master
+      continue-on-error: true
       if: env.REPO_TOKEN && env.UPLOAD_FIRMWARE_FOR_RELEASE == 'true'
       with:
         pattern: "${{ env.FIRMWARE }}/*"
@@ -209,10 +219,15 @@ jobs:
       continue-on-error: true
       if: env.UPLOAD_FIRMWARE_FOR_ARTIFACT == 'true'
       with:
-        name: ${{ env.date3 }} ${{ env.DEVICE_NAME }} ${{ env.EMOJI }}
+        name: ${{ env.date3 }} ${{ env.DEVICE_NAME }}
         path: ${{ env.FIRMWARE }}
         
     - name: WeChat notification
       if: env.SCKEY && !cancelled()
       run: |
-        [ ${{ env.status }} == 'success' ] && curl https://sc.ftqq.com/${{ secrets.SCKEY }}.send?text=OpenWrt_${{ env.date3 }}_${{ env.DEVICE_NAME }}编译完成 || curl https://sc.ftqq.com/${{ secrets.SCKEY }}.send?text=OpenWrt_${{ env.date3 }}_${{ env.DEVICE_NAME }}编译失败
+        [ ${{ env.status }} == 'success' ] && curl https://sc.ftqq.com/${{ secrets.SCKEY }}.send?text=🎉OpenWrt_${{ env.date3 }}_${{ env.DEVICE_NAME }}编译完成😋 || curl https://sc.ftqq.com/${{ secrets.SCKEY }}.send?text=❌OpenWrt_${{ env.date3 }}_${{ env.DEVICE_NAME }}编译失败😂
+
+    - name: Telegram notification
+      if: env.TELEGRAM_TOKEN && !cancelled()
+      run: |
+        [ ${{ env.status }} == 'success' ] && curl -k --data chat_id="${{ secrets.TELEGRAM_TO }}" --data "text=🎉 OpenWrt ${{ env.date3 }} ${{ env.DEVICE_NAME }} 编译成功 😋" "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" || curl -k --data chat_id="${{ secrets.TELEGRAM_TO }}" --data "text=❌ OpenWrt ${{ env.date3 }} ${{ env.DEVICE_NAME }} 编译失败 😂" "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage"
